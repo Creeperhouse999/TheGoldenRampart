@@ -31,6 +31,9 @@ intents.members = True  # Required for member join events
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Track processed events to prevent duplicates
+processed_members = set()
+
 
 @bot.event
 async def on_ready():
@@ -43,6 +46,16 @@ async def on_member_join(member):
     Welcomes new members to the server.
     """
     try:
+        # Prevent duplicate welcome messages
+        member_key = f"{member.id}_{member.guild.id}"
+        if member_key in processed_members:
+            return
+        processed_members.add(member_key)
+        
+        # Clean up old entries (keep last 1000)
+        if len(processed_members) > 1000:
+            processed_members.clear()
+        
         # Find a channel to send the welcome message
         # Try to find a welcome channel first, then general, then any text channel
         welcome_channel = None
@@ -146,7 +159,7 @@ User's message: {message}
 
 Respond naturally and helpfully, but keep it short and appropriate."""
         
-            # Use Gemini API to generate response (same approach as verify command)
+        # Use Gemini API to generate response (same approach as verify command)
         try:
             headers = {
                 'Content-Type': 'application/json',
@@ -237,14 +250,17 @@ Respond naturally and helpfully, but keep it short and appropriate."""
                 if len(response_text) > 2000:
                     response_text = response_text[:1997] + "..."
                 await ctx.send(response_text)
+                return  # Explicit return to prevent any duplicate sending
             else:
                 error_msg = "Sorry, I couldn't generate a response right now."
                 if last_error:
                     error_msg += f" Error: {last_error}"
                 await ctx.send(error_msg)
+                return  # Explicit return to prevent any duplicate sending
                 
         except Exception as e:
             await ctx.send(f"Error: {str(e)}")
+            return  # Explicit return to prevent any duplicate sending
             
     except Exception as e:
         await ctx.send(f"An error occurred: {str(e)}")
