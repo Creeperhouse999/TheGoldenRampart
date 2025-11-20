@@ -538,22 +538,35 @@ async def next_clear_info(ctx):
         
         global chat_clear_enabled
         
-        # Calculate next 1st of month
         now = datetime.now()
+        
+        # Calculate next 1st of month (this month)
         if now.month == 12:
             next_month = datetime(now.year + 1, 1, 1, 0, 0, 0)
         else:
             next_month = datetime(now.year, now.month + 1, 1, 0, 0, 0)
         
-        days_until = (next_month - now).days
-        hours_until = (next_month - now).total_seconds() / 3600
+        # Calculate the month after that (in case current is cancelled)
+        if next_month.month == 12:
+            month_after = datetime(next_month.year + 1, 1, 1, 0, 0, 0)
+        else:
+            month_after = datetime(next_month.year, next_month.month + 1, 1, 0, 0, 0)
         
         if chat_clear_enabled:
+            # Clear is enabled, show next clear
+            days_until = (next_month - now).days
+            hours_until = (next_month - now).total_seconds() / 3600
             await ctx.send(f"📅 Next chat clear: **{next_month.strftime('%B 1st, %Y at %I:%M %p')}**\n"
                           f"⏰ Time remaining: {days_until} day(s) ({int(hours_until)} hours)")
         else:
-            await ctx.send(f"❌ Chat clear is **CANCELLED** for {next_month.strftime('%B 1st, %Y')}.\n"
-                          f"Use `!notclear` again after the scheduled date to resume automatic clears, or use `!clear` to manually clear now.")
+            # Clear is cancelled, show cancelled month and next active one
+            days_until_next = (next_month - now).days
+            days_until_after = (month_after - now).days
+            hours_until_after = (month_after - now).total_seconds() / 3600
+            
+            await ctx.send(f"❌ Chat clear is **CANCELLED** for {next_month.strftime('%B 1st, %Y')}.\n\n"
+                          f"📅 Next active chat clear: **{month_after.strftime('%B 1st, %Y at %I:%M %p')}**\n"
+                          f"⏰ Time remaining: {days_until_after} day(s) ({int(hours_until_after)} hours)")
             
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
