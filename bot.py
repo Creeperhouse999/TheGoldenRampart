@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
 import certifi
 import aiohttp
@@ -8,6 +8,7 @@ import base64
 import re
 from flask import Flask
 from threading import Thread
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -34,10 +35,112 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Track processed events to prevent duplicates
 processed_members = set()
 
+# Chat clear scheduling
+chat_clear_enabled = True  # Set to False when !notclear is used
+target_channel_id = 1440064713584279632  # Channel to clear
+warning_channel_id = 1440439226029314190  # Channel for warnings
+warnings_sent = {'3days': False, '1day': False}  # Track sent warnings
+
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} has logged in and is ready!')
+    # Start the scheduled tasks
+    if not check_chat_clear.is_running():
+        check_chat_clear.start()
+
+
+@tasks.loop(hours=1)  # Check every hour
+async def check_chat_clear():
+    """Check if chat clear warnings or actual clear needs to happen"""
+    global chat_clear_enabled, warnings_sent
+    
+    try:
+        now = datetime.now()
+        
+        # Calculate next 1st of month
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1, 0, 0, 0)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1, 0, 0, 0)
+        
+        days_until = (next_month - now).days
+        hours_until = (next_month - now).total_seconds() / 3600
+        
+        # Check if it's time to clear (1st of month, midnight)
+        if now.day == 1 and now.hour == 0 and now.minute < 5:  # Check within first 5 minutes
+            if chat_clear_enabled:
+                clear_channel = bot.get_channel(target_channel_id)
+                if clear_channel:
+                    try:
+                        # Delete all messages
+                        deleted = await clear_channel.purge(limit=None, check=lambda m: not m.pinned)
+                        await clear_channel.send(f"Chat cleared! Deleted {len(deleted)} messages.")
+                    except discord.Forbidden:
+                        print("No permission to clear chat")
+                    except Exception as e:
+                        print(f"Error clearing chat: {e}")
+            
+            # Reset for next month
+            chat_clear_enabled = True
+            warnings_sent = {'3days': False, '1day': False}
+        
+        # Check for warning dates (only if clear is enabled)
+        elif chat_clear_enabled:
+            warning_channel = bot.get_channel(warning_channel_id)
+            if warning_channel:
+                # 3 days before (approximately 72 hours)
+                if 2.5 <= days_until <= 3.5 and not warnings_sent['3days']:
+                    await warning_channel.send(f"⚠️ Chat clear scheduled: 3 days remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y')}.")
+                    warnings_sent['3days'] = True
+                
+                # 1 day before (approximately 24 hours)
+                elif 0.5 <= days_until <= 1.5 and not warnings_sent['1day']:
+                    await warning_channel.send(f"⚠️ Chat clear scheduled: 1 day remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y')}.")
+                    warnings_sent['1day'] = True
+                
+                # Reset warnings if more than 4 days away (new month cycle)
+                if days_until > 4:
+                    warnings_sent = {'3days': False, '1day': False}
+    
+    except Exception as e:
+        print(f"Error in check_chat_clear: {e}")
+
+
+@bot.command(name='notclear')
+async def cancel_chat_clear(ctx):
+    """
+    Cancels the next scheduled chat clear.
+    
+    Usage: !notclear
+    """
+    global chat_clear_enabled, warnings_sent
+    
+    try:
+        # Check if command is used in a server (not DM)
+        if ctx.guild is None:
+            await ctx.send("❌ This command can only be used in a server, not in direct messages.")
+            return
+        
+        # Check if user has admin/manage server permissions
+        if not ctx.author.guild_permissions.manage_guild and not ctx.author.guild_permissions.administrator:
+            await ctx.send("❌ You don't have permission to use this command.")
+            return
+        
+        chat_clear_enabled = False
+        warnings_sent = {'3days': True, '1day': True}  # Mark as sent to prevent sending more
+        
+        # Calculate next 1st of month for confirmation
+        now = datetime.now()
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1)
+        
+        await ctx.send(f"✅ Chat clear cancelled. The scheduled clear on {next_month.strftime('%B 1st, %Y')} has been cancelled.")
+    
+    except Exception as e:
+        await ctx.send(f"❌ An error occurred: {str(e)}")
 
 
 @bot.event
@@ -141,10 +244,18 @@ async def bot_chat(ctx, *, message: str):
         
         # Prepare context for Gemini
         context = f"""You are a helpful bot in a Discord server called "The Golden Rampant" for the game "Bulwark".
-        
+
 Server context:
 - Server name: The Golden Rampant
-- Game: Bulwark
+- Game: Bulwark (on Roblox)
+
+About Bulwark:
+- Bulwark is a dueling game on Roblox
+- Set on a Mediterranean-like island called Bulwark
+- Two rival empires compete: Guesmand and Sunderland
+- Players compete in tournaments
+- Combat system focuses on melee and blocking
+- Gameplay involves dueling mechanics between the two empires
 
 Important rules:
 - Do NOT generate images
@@ -155,6 +266,7 @@ Important rules:
 - If someone greets you (says hello, hi, etc.), respond with "Welcome to The Golden Rampant! How can I help?"
 - If asked what AI model you are or what model you use, say you're just a helpful bot and don't reveal technical details
 - Never mention Gemini, Google, AI models, or technical implementation details
+- When discussing Bulwark, mention it's a Roblox game about dueling between Guesmand and Sunderland empires
 
 User's message: {message}
 
