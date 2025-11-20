@@ -165,7 +165,8 @@ async def cancel_chat_clear(ctx):
         await ctx.send(f"✅ Chat clear cancelled. The scheduled clear on {next_month.strftime('%B 1st, %Y')} has been cancelled.")
     
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.command(name='yesclear')
@@ -201,7 +202,8 @@ async def enable_chat_clear(ctx):
         await ctx.send(f"✅ Chat clear **RE-ENABLED**. The scheduled clear on {next_month.strftime('%B 1st, %Y')} is now active.")
     
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.event
@@ -435,9 +437,6 @@ Respond naturally and helpfully, but keep it short and appropriate."""
         except Exception as e:
             await ctx.send(f"Error: {str(e)}")
             return  # Explicit return to prevent any duplicate sending
-            
-    except Exception as e:
-        await ctx.send(f"An error occurred: {str(e)}")
 
 
 @bot.command(name='sendmessage')
@@ -468,13 +467,17 @@ async def send_message(ctx, channel_name: str, *, message_text: str):
             return
         
         # Send the message to the specified channel
-        await channel.send(message_text)
-        await ctx.send(f"✅ Message sent to {channel.mention}!")
-        
-    except discord.Forbidden:
-        await ctx.send(f"❌ I don't have permission to send messages in that channel.")
+        try:
+            await channel.send(message_text)
+            await ctx.send(f"✅ Message sent to {channel.mention}!")
+        except discord.Forbidden:
+            await ctx.send(f"❌ I don't have permission to send messages in that channel.")
+        except Exception as e:
+            await ctx.send(f"❌ An error occurred: {str(e)}")
+            
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.command(name='clear')
@@ -520,7 +523,8 @@ async def clear_chat(ctx):
             await ctx.send(f"❌ Error clearing chat: {str(e)}")
             
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.command(name='nextclear')
@@ -569,7 +573,8 @@ async def next_clear_info(ctx):
                           f"⏰ Time remaining: {days_until_after} day(s) ({int(hours_until_after)} hours)")
             
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.command(name='verify')
@@ -824,7 +829,9 @@ Proof:
         await ctx.send("✅ Verification complete! Message sent to the verification channel.")
             
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        # Most errors are already handled above with specific messages
+        pass
 
 
 @bot.event
