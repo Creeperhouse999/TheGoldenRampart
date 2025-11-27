@@ -50,7 +50,7 @@ A Discord bot that sends messages to different channels based on commands.
 
 2. **Navigate to the bot folder:**
    ```bash
-   cd /Users/alandebowski/Downloads/CURSOR/BOT_KUBAANDTYMON
+   cd /none
    ```
    (Or use the path where you saved the bot files)
 
