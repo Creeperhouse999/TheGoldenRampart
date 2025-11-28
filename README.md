@@ -135,7 +135,6 @@ A Discord bot that sends messages to different channels based on commands.
    - Click **"Yes, do it!"** if prompted
    - **IMPORTANT:** Copy the token immediately - it looks like:
      ```
-     MTAyMzQ1Njc4OTAxMjM0NTY3OA.GaBcDe.FgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVw
      ```
    - **⚠️ NEVER share this token publicly!** Treat it like a password.
 
@@ -242,7 +241,7 @@ A Discord bot that sends messages to different channels based on commands.
 
 1. **Make sure you're in the project directory:**
    ```bash
-   cd /Users/alandebowski/Downloads/CURSOR/BOT_KUBAANDTYMON
+   cd /none
    ```
 
 2. **Run the bot:**
